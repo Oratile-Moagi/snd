@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
+  BankAccount,
   Client,
   CompanySettings,
   Equipment,
@@ -49,6 +50,11 @@ interface AppState {
 
   updateSettings: (patch: Partial<CompanySettings>) => void;
 
+  addBank: (b: Omit<BankAccount, "id">) => BankAccount;
+  updateBank: (id: string, patch: Partial<BankAccount>) => void;
+  deleteBank: (id: string) => void;
+  setDefaultBank: (id: string) => void;
+
   addEquipment: (e: Omit<Equipment, "id">) => Equipment;
   updateEquipment: (id: string, patch: Partial<Equipment>) => void;
   deleteEquipment: (id: string) => void;
@@ -89,6 +95,48 @@ export const useStore = create<AppState>()(
 
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),
+
+      addBank: (b) => {
+        const bank: BankAccount = { ...b, id: uid("bank") };
+        set((s) => {
+          const bankAccounts = [...s.settings.bankAccounts, bank];
+          return {
+            settings: {
+              ...s.settings,
+              bankAccounts,
+              defaultBankAccountId:
+                s.settings.defaultBankAccountId ?? bank.id,
+            },
+          };
+        });
+        return bank;
+      },
+      updateBank: (id, patch) =>
+        set((s) => ({
+          settings: {
+            ...s.settings,
+            bankAccounts: s.settings.bankAccounts.map((b) =>
+              b.id === id ? { ...b, ...patch } : b
+            ),
+          },
+        })),
+      deleteBank: (id) =>
+        set((s) => {
+          const bankAccounts = s.settings.bankAccounts.filter(
+            (b) => b.id !== id
+          );
+          const defaultBankAccountId =
+            s.settings.defaultBankAccountId === id
+              ? bankAccounts[0]?.id
+              : s.settings.defaultBankAccountId;
+          return {
+            settings: { ...s.settings, bankAccounts, defaultBankAccountId },
+          };
+        }),
+      setDefaultBank: (id) =>
+        set((s) => ({
+          settings: { ...s.settings, defaultBankAccountId: id },
+        })),
 
       addEquipment: (e) => {
         const item: Equipment = { ...e, id: uid("eq") };
@@ -201,6 +249,41 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "snd-store-v1",
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = persisted as { settings?: Record<string, unknown> };
+        if (version < 2 && state?.settings) {
+          const old = state.settings as Record<string, unknown>;
+          if (!Array.isArray(old.bankAccounts)) {
+            const hasLegacy =
+              old.bankName || old.bankAccountNumber || old.bankAccountName;
+            old.bankAccounts = hasLegacy
+              ? [
+                  {
+                    id: "bank-1",
+                    label: (old.bankName as string) || "Primary account",
+                    accountName:
+                      (old.bankAccountName as string) ||
+                      (old.legalName as string) ||
+                      "",
+                    bankName: (old.bankName as string) || "",
+                    accountNumber: (old.bankAccountNumber as string) || "",
+                    branchCode: (old.bankBranchCode as string) || "",
+                  },
+                ]
+              : [...DEFAULT_SETTINGS.bankAccounts];
+            old.defaultBankAccountId =
+              (old.bankAccounts as BankAccount[])[0]?.id;
+          }
+          if (typeof old.tagline !== "string") {
+            old.tagline = DEFAULT_SETTINGS.tagline;
+          }
+          if (!old.regNumber) {
+            old.regNumber = DEFAULT_SETTINGS.regNumber;
+          }
+        }
+        return state;
+      },
       storage: createJSONStorage(() => localStorage),
       partialize: ({
         settings,

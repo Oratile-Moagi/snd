@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Truck,
   FolderKanban,
@@ -9,7 +10,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { documentTotals, formatCurrency, formatDate } from "@/lib/calc";
+import {
+  documentTotals,
+  formatCurrency,
+  formatDate,
+  todayISO,
+  addDaysISO,
+} from "@/lib/calc";
 import { PageContainer } from "@/components/page";
 import { Logo } from "@/components/logo";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,12 +24,42 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const equipment = useStore((s) => s.equipment);
   const projects = useStore((s) => s.projects);
   const quotes = useStore((s) => s.quotes);
   const invoices = useStore((s) => s.invoices);
   const clients = useStore((s) => s.clients);
   const settings = useStore((s) => s.settings);
+  const addQuote = useStore((s) => s.addQuote);
+  const addInvoice = useStore((s) => s.addInvoice);
+
+  function createQuote() {
+    const q = addQuote({
+      date: todayISO(),
+      validUntil: addDaysISO(todayISO(), 30),
+      status: "draft",
+      items: [],
+      vatEnabled: true,
+      vatRate: settings.defaultVatRate,
+      terms: settings.defaultTerms,
+    });
+    router.push(`/quotes/${q.id}`);
+  }
+
+  function createInvoice() {
+    const inv = addInvoice({
+      date: todayISO(),
+      dueDate: addDaysISO(todayISO(), 30),
+      status: "unpaid",
+      items: [],
+      vatEnabled: true,
+      vatRate: settings.defaultVatRate,
+      terms: settings.defaultTerms,
+      amountPaid: 0,
+    });
+    router.push(`/invoices/${inv.id}`);
+  }
 
   const cur = settings.currencySymbol;
   const activeProjects = projects.filter((p) => p.status === "active").length;
@@ -86,14 +123,18 @@ export default function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            asChild
             variant="secondary"
             className="bg-white/15 text-white hover:bg-white/25"
+            onClick={createQuote}
           >
-            <Link href="/quotes">New quote</Link>
+            New quote
           </Button>
-          <Button asChild variant="secondary" className="text-primary">
-            <Link href="/invoices">New invoice</Link>
+          <Button
+            variant="secondary"
+            className="text-primary"
+            onClick={createInvoice}
+          >
+            New invoice
           </Button>
         </div>
       </div>

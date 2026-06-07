@@ -1,8 +1,9 @@
 "use client";
 
+import { Plus, Trash2, Star } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
-import type { CompanySettings } from "@/lib/types";
+import type { BankAccount, CompanySettings } from "@/lib/types";
 import { PageContainer, PageHeader } from "@/components/page";
 import { Logo } from "@/components/logo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,11 +11,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function SettingsPage() {
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.updateSettings);
+  const addBank = useStore((s) => s.addBank);
+  const updateBank = useStore((s) => s.updateBank);
+  const deleteBank = useStore((s) => s.deleteBank);
+  const setDefaultBank = useStore((s) => s.setDefaultBank);
   const resetAll = useStore((s) => s.resetAll);
+
+  function setBank<K extends keyof BankAccount>(
+    id: string,
+    key: K,
+    value: BankAccount[K]
+  ) {
+    updateBank(id, { [key]: value } as Partial<BankAccount>);
+  }
 
   function set<K extends keyof CompanySettings>(
     key: K,
@@ -62,6 +76,13 @@ export default function SettingsPage() {
               <Input
                 value={settings.legalName}
                 onChange={(e) => set("legalName", e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>Tagline (shown under the name on documents)</Label>
+              <Input
+                value={settings.tagline}
+                onChange={(e) => set("tagline", e.target.value)}
               />
             </div>
             <div className="grid gap-2">
@@ -112,37 +133,123 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Banking details</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>Bank accounts</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  addBank({
+                    label: "New bank account",
+                    accountName: settings.legalName,
+                    bankName: "",
+                    accountNumber: "",
+                    branchCode: "",
+                  });
+                  toast.success("Bank account added.");
+                }}
+              >
+                <Plus className="size-4" /> Add bank
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Account name</Label>
-              <Input
-                value={settings.bankAccountName}
-                onChange={(e) => set("bankAccountName", e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Bank</Label>
-              <Input
-                value={settings.bankName}
-                onChange={(e) => set("bankName", e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Account number</Label>
-              <Input
-                value={settings.bankAccountNumber}
-                onChange={(e) => set("bankAccountNumber", e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Branch code</Label>
-              <Input
-                value={settings.bankBranchCode}
-                onChange={(e) => set("bankBranchCode", e.target.value)}
-              />
-            </div>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Add as many accounts as you like. Pick which one appears on each
+              quote or invoice from the document’s editor.
+            </p>
+            {settings.bankAccounts.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                No bank accounts yet. Add one above.
+              </p>
+            )}
+            {settings.bankAccounts.map((b) => {
+              const isDefault = settings.defaultBankAccountId === b.id;
+              return (
+                <div
+                  key={b.id}
+                  className="rounded-lg border p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {b.label || "Untitled account"}
+                      </span>
+                      {isDefault && (
+                        <Badge variant="secondary">Default</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!isDefault && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDefaultBank(b.id)}
+                        >
+                          <Star className="size-4" /> Set default
+                        </Button>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Delete bank account"
+                        onClick={() => {
+                          deleteBank(b.id);
+                          toast.success("Bank account removed.");
+                        }}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label>Label</Label>
+                      <Input
+                        value={b.label}
+                        onChange={(e) => setBank(b.id, "label", e.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Account name</Label>
+                      <Input
+                        value={b.accountName}
+                        onChange={(e) =>
+                          setBank(b.id, "accountName", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Bank</Label>
+                      <Input
+                        value={b.bankName}
+                        onChange={(e) =>
+                          setBank(b.id, "bankName", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Account number</Label>
+                      <Input
+                        value={b.accountNumber}
+                        onChange={(e) =>
+                          setBank(b.id, "accountNumber", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Branch code</Label>
+                      <Input
+                        value={b.branchCode}
+                        onChange={(e) =>
+                          setBank(b.id, "branchCode", e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 

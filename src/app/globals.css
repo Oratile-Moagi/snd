@@ -153,10 +153,22 @@
   color: transparent;
 }
 
+/* Branded document (A4) */
+.doc-a4 {
+  min-height: 1123px; /* A4 height at 96dpi */
+}
+.doc-title {
+  color: #0e2f3d;
+}
+.doc-footer {
+  background-image: linear-gradient(90deg, #0c3a44 0%, #176d6d 100%);
+}
+
 /* Print styles: hide app chrome, show only printable document */
 @media print {
   @page {
-    margin: 14mm;
+    size: A4;
+    margin: 0;
   }
   body {
     background: #fff !important;
@@ -168,8 +180,10 @@
     position: absolute;
     inset: 0;
     margin: 0;
-    padding: 0;
     width: 100%;
+  }
+  .doc-a4 {
+    min-height: auto;
   }
   .print-shadow-none {
     box-shadow: none !important;
