@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaRegister } from "@/components/pwa-register";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-muted/30">
         {children}
         <Toaster richColors position="top-right" />
+        <PwaRegister />
       </body>
     </html>
   );
