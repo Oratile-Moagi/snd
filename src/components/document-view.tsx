@@ -55,7 +55,7 @@ export function DocumentView({
   const bank = bankAccount ?? settings.bankAccounts[0];
 
   return (
-    <div className="print-area mx-auto flex w-full max-w-[794px] flex-col bg-white text-[13px] text-neutral-800 print:max-w-none doc-a4">
+    <div className="print-area mx-auto flex min-h-[1123px] w-full max-w-[794px] flex-col bg-white text-[13px] text-neutral-800 print:min-h-0 print:max-w-none">
       {/* Header */}
       <div className="relative overflow-hidden">
         <div
@@ -83,7 +83,10 @@ export function DocumentView({
             </div>
           </div>
           <div className="relative pt-1 text-right">
-            <div className="doc-title text-4xl font-extrabold tracking-tight">
+            <div
+              className="text-4xl font-extrabold tracking-tight"
+              style={{ color: "#0e2f3d" }}
+            >
               {title}
             </div>
             <div className="mt-3 space-y-0.5 text-sm text-neutral-600">
@@ -283,7 +286,13 @@ export function DocumentView({
 
       {/* Footer contact pill */}
       <div className="mt-auto px-10 pb-10 pt-10">
-        <div className="doc-footer flex flex-wrap items-center justify-around gap-4 rounded-full px-8 py-4 text-sm text-white">
+        <div
+          className="flex flex-wrap items-center justify-around gap-4 rounded-full px-8 py-4 text-sm text-white"
+          style={{
+            backgroundImage:
+              "linear-gradient(90deg, #0c3a44 0%, #176d6d 100%)",
+          }}
+        >
           <span className="flex items-center gap-2">
             <Globe className="size-4 opacity-90" />
             {settings.website}
