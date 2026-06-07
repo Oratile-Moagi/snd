@@ -1,0 +1,297 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Printer } from "lucide-react";
+import { useStore } from "@/lib/store";
+import type { InvoiceStatus } from "@/lib/types";
+import { documentTotals, formatCurrency } from "@/lib/calc";
+import { PageContainer } from "@/components/page";
+import { LineItemsEditor } from "@/components/line-items-editor";
+import { DocumentView } from "@/components/document-view";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const NONE = "__none__";
+
+const STATUS_LABELS: Record<InvoiceStatus, string> = {
+  unpaid: "Unpaid",
+  paid: "Paid",
+  overdue: "Overdue",
+};
+
+export default function InvoiceEditorPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const id = params.id;
+
+  const invoice = useStore((s) => s.invoices.find((i) => i.id === id));
+  const clients = useStore((s) => s.clients);
+  const projects = useStore((s) => s.projects);
+  const settings = useStore((s) => s.settings);
+  const updateInvoice = useStore((s) => s.updateInvoice);
+
+  if (!invoice) {
+    return (
+      <PageContainer>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Invoice not found.
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/invoices")}
+              >
+                Back to invoices
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  const client = clients.find((c) => c.id === invoice.clientId);
+  const project = projects.find((p) => p.id === invoice.projectId);
+  const totals = documentTotals(invoice);
+
+  return (
+    <PageContainer className="max-w-5xl">
+      <div className="no-print mb-4 flex items-center justify-between gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push("/invoices")}
+        >
+          <ArrowLeft className="size-4" /> Invoices
+        </Button>
+        <span className="font-mono text-sm text-muted-foreground">
+          {invoice.number}
+        </span>
+      </div>
+
+      <Tabs defaultValue="edit">
+        <TabsList className="no-print mb-4">
+          <TabsTrigger value="edit">Edit</TabsTrigger>
+          <TabsTrigger value="preview">Preview & print</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="edit" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Details</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Client</Label>
+                <Select
+                  value={invoice.clientId ?? NONE}
+                  onValueChange={(v) =>
+                    updateInvoice(invoice.id, {
+                      clientId: v === NONE ? undefined : v,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>No client</SelectItem>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.company || c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Project</Label>
+                <Select
+                  value={invoice.projectId ?? NONE}
+                  onValueChange={(v) =>
+                    updateInvoice(invoice.id, {
+                      projectId: v === NONE ? undefined : v,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>No project</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="date">Invoice date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={invoice.date}
+                  onChange={(e) =>
+                    updateInvoice(invoice.id, { date: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="due">Due date</Label>
+                <Input
+                  id="due"
+                  type="date"
+                  value={invoice.dueDate ?? ""}
+                  onChange={(e) =>
+                    updateInvoice(invoice.id, { dueDate: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                <Select
+                  value={invoice.status}
+                  onValueChange={(v) =>
+                    updateInvoice(invoice.id, { status: v as InvoiceStatus })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Line items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LineItemsEditor
+                items={invoice.items}
+                onChange={(items) => updateInvoice(invoice.id, { items })}
+                currencySymbol={settings.currencySymbol}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Totals & terms</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={invoice.vatEnabled}
+                    onChange={(e) =>
+                      updateInvoice(invoice.id, {
+                        vatEnabled: e.target.checked,
+                      })
+                    }
+                  />
+                  Add VAT
+                </label>
+                {invoice.vatEnabled && (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="vatrate" className="text-sm">
+                      VAT %
+                    </Label>
+                    <Input
+                      id="vatrate"
+                      type="number"
+                      className="w-20"
+                      value={Math.round(invoice.vatRate * 100)}
+                      onChange={(e) =>
+                        updateInvoice(invoice.id, {
+                          vatRate: Number(e.target.value) / 100,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                <div className="ml-auto text-right">
+                  <div className="text-sm text-muted-foreground">Total</div>
+                  <div className="text-xl font-semibold tabular-nums">
+                    {formatCurrency(totals.total, settings.currencySymbol)}
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="terms">Payment terms</Label>
+                <Textarea
+                  id="terms"
+                  rows={2}
+                  value={invoice.terms ?? ""}
+                  onChange={(e) =>
+                    updateInvoice(invoice.id, { terms: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  rows={2}
+                  value={invoice.notes ?? ""}
+                  onChange={(e) =>
+                    updateInvoice(invoice.id, { notes: e.target.value })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="preview">
+          <div className="no-print mb-4 flex justify-end">
+            <Button onClick={() => window.print()}>
+              <Printer className="size-4" /> Print / Save PDF
+            </Button>
+          </div>
+          <div className="overflow-x-auto rounded-xl border bg-white shadow-sm print-shadow-none">
+            <DocumentView
+              settings={settings}
+              client={client}
+              project={project}
+              doc={{
+                kind: "invoice",
+                number: invoice.number,
+                date: invoice.date,
+                secondaryDateLabel: "Due date",
+                secondaryDate: invoice.dueDate,
+                statusLabel: STATUS_LABELS[invoice.status],
+                items: invoice.items,
+                vatEnabled: invoice.vatEnabled,
+                vatRate: invoice.vatRate,
+                notes: invoice.notes,
+                terms: invoice.terms,
+              }}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </PageContainer>
+  );
+}
