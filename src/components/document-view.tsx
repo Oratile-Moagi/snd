@@ -112,8 +112,11 @@ export function DocumentView({
         </div>
       </div>
 
+      {/* Body — vertically centered so content fills the page evenly */}
+      <div className="flex flex-1 flex-col px-10 print:flex-none">
+        <div className="my-auto w-full space-y-12 py-10 print:my-0">
       {/* Bank details + Bill to */}
-      <div className="grid grid-cols-2 gap-8 px-10 pt-8">
+      <div className="grid grid-cols-2 gap-8">
         {bank ? (
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-900">
@@ -185,7 +188,7 @@ export function DocumentView({
       </div>
 
       {/* Items */}
-      <div className="px-10 pt-8">
+      <div>
         <table className="w-full border-collapse">
           <thead>
             <tr className="brand-gradient text-left text-white">
@@ -283,9 +286,11 @@ export function DocumentView({
           </div>
         )}
       </div>
+        </div>
+      </div>
 
       {/* Footer contact pill */}
-      <div className="mt-auto px-10 pb-10 pt-10">
+      <div className="px-10 pb-10 pt-6">
         <div
           className="flex flex-wrap items-center justify-around gap-4 rounded-full px-8 py-4 text-sm text-white"
           style={{

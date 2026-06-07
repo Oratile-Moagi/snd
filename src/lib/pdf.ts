@@ -33,10 +33,14 @@ export async function downloadElementAsPdf(
   let heightLeft = imgHeight;
   let position = 0;
 
+  // Tolerance (mm) so sub-millimeter rounding overflow doesn't spill onto a
+  // blank extra page. ~1mm ≈ 4px at 96dpi.
+  const pageTolerance = 2;
+
   pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
   heightLeft -= pageHeight;
 
-  while (heightLeft > 0) {
+  while (heightLeft > pageTolerance) {
     position -= pageHeight;
     pdf.addPage();
     pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
