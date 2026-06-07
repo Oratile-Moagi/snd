@@ -156,7 +156,8 @@
 /* Print styles: hide app chrome, show only printable document */
 @media print {
   @page {
-    margin: 14mm;
+    size: A4;
+    margin: 0;
   }
   body {
     background: #fff !important;
@@ -168,7 +169,6 @@
     position: absolute;
     inset: 0;
     margin: 0;
-    padding: 0;
     width: 100%;
   }
   .print-shadow-none {

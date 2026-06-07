@@ -1,13 +1,18 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer } from "lucide-react";
+import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { InvoiceStatus } from "@/lib/types";
 import { documentTotals, formatCurrency } from "@/lib/calc";
+import { downloadElementAsPdf } from "@/lib/pdf";
 import { PageContainer } from "@/components/page";
 import { LineItemsEditor } from "@/components/line-items-editor";
 import { DocumentView } from "@/components/document-view";
+import { CreateClientDialog } from "@/components/create-client-dialog";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +46,9 @@ export default function InvoiceEditorPage() {
   const settings = useStore((s) => s.settings);
   const updateInvoice = useStore((s) => s.updateInvoice);
 
+  const docRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
   if (!invoice) {
     return (
       <PageContainer>
@@ -63,7 +71,26 @@ export default function InvoiceEditorPage() {
 
   const client = clients.find((c) => c.id === invoice.clientId);
   const project = projects.find((p) => p.id === invoice.projectId);
+  const bankAccount =
+    settings.bankAccounts.find(
+      (b) => b.id === (invoice.bankAccountId ?? settings.defaultBankAccountId)
+    ) ?? settings.bankAccounts[0];
   const totals = documentTotals(invoice);
+
+  async function downloadPdf() {
+    const el = docRef.current?.querySelector(".print-area") as
+      | HTMLElement
+      | null;
+    if (!el) return;
+    setDownloading(true);
+    try {
+      await downloadElementAsPdf(el, `${invoice!.number}.pdf`);
+    } catch {
+      toast.error("Could not generate PDF. Try the print option instead.");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <PageContainer className="max-w-5xl">
@@ -94,45 +121,87 @@ export default function InvoiceEditorPage() {
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Client</Label>
-                <Select
-                  value={invoice.clientId ?? NONE}
-                  onValueChange={(v) =>
-                    updateInvoice(invoice.id, {
-                      clientId: v === NONE ? undefined : v,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>No client</SelectItem>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.company || c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select
+                    value={invoice.clientId ?? NONE}
+                    onValueChange={(v) =>
+                      updateInvoice(invoice.id, {
+                        clientId: v === NONE ? undefined : v,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>No client</SelectItem>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.company || c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <CreateClientDialog
+                    onCreated={(id) =>
+                      updateInvoice(invoice.id, { clientId: id })
+                    }
+                  />
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label>Project</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={invoice.projectId ?? NONE}
+                    onValueChange={(v) =>
+                      updateInvoice(invoice.id, {
+                        projectId: v === NONE ? undefined : v,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>No project</SelectItem>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <CreateProjectDialog
+                    clientId={invoice.clientId}
+                    onCreated={(id) =>
+                      updateInvoice(invoice.id, { projectId: id })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Bank account (shown on document)</Label>
                 <Select
-                  value={invoice.projectId ?? NONE}
+                  value={
+                    invoice.bankAccountId ??
+                    settings.defaultBankAccountId ??
+                    settings.bankAccounts[0]?.id ??
+                    NONE
+                  }
                   onValueChange={(v) =>
                     updateInvoice(invoice.id, {
-                      projectId: v === NONE ? undefined : v,
+                      bankAccountId: v === NONE ? undefined : v,
                     })
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
+                    <SelectValue placeholder="Select bank account" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>No project</SelectItem>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                    {settings.bankAccounts.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -265,16 +334,24 @@ export default function InvoiceEditorPage() {
         </TabsContent>
 
         <TabsContent value="preview">
-          <div className="no-print mb-4 flex justify-end">
-            <Button onClick={() => window.print()}>
-              <Printer className="size-4" /> Print / Save PDF
+          <div className="no-print mb-4 flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="size-4" /> Print
+            </Button>
+            <Button onClick={downloadPdf} disabled={downloading}>
+              <Download className="size-4" />{" "}
+              {downloading ? "Preparing…" : "Download PDF"}
             </Button>
           </div>
-          <div className="overflow-x-auto rounded-xl border bg-white shadow-sm print-shadow-none">
+          <div
+            ref={docRef}
+            className="overflow-x-auto rounded-xl border bg-white shadow-sm print-shadow-none"
+          >
             <DocumentView
               settings={settings}
               client={client}
               project={project}
+              bankAccount={bankAccount}
               doc={{
                 kind: "invoice",
                 number: invoice.number,

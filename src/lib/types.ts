@@ -86,6 +86,8 @@ export interface Quote {
   number: string;
   clientId?: string;
   projectId?: string;
+  /** Which bank account to show on this document. */
+  bankAccountId?: string;
   date: string;
   validUntil?: string;
   status: DocStatus;
@@ -104,6 +106,8 @@ export interface Invoice {
   quoteId?: string;
   clientId?: string;
   projectId?: string;
+  /** Which bank account to show on this document. */
+  bankAccountId?: string;
   date: string;
   dueDate?: string;
   status: InvoiceStatus;
@@ -115,19 +119,29 @@ export interface Invoice {
   amountPaid: number;
 }
 
+export interface BankAccount {
+  id: string;
+  /** Short label to pick this account, e.g. "FNB — Cheque". */
+  label: string;
+  accountName: string;
+  bankName: string;
+  accountNumber: string;
+  branchCode: string;
+}
+
 export interface CompanySettings {
   name: string;
   legalName: string;
+  tagline: string;
   phone: string;
   email: string;
   website: string;
   address: string;
   vatNumber: string;
   regNumber: string;
-  bankName: string;
-  bankAccountName: string;
-  bankAccountNumber: string;
-  bankBranchCode: string;
+  bankAccounts: BankAccount[];
+  /** Bank account used by default on new documents. */
+  defaultBankAccountId?: string;
   defaultVatRate: number;
   currencySymbol: string;
   defaultTerms: string;
