@@ -12,6 +12,7 @@ import {
 import { useStore } from "@/lib/store";
 import {
   documentTotals,
+  effectiveInvoiceStatus,
   formatCurrency,
   formatDate,
   todayISO,
@@ -244,7 +245,7 @@ export default function DashboardPage() {
                           {formatCurrency(documentTotals(inv).total, cur)}
                         </div>
                         <Badge variant="outline" className="mt-0.5 capitalize">
-                          {inv.status}
+                          {effectiveInvoiceStatus(inv)}
                         </Badge>
                       </div>
                     </Link>
