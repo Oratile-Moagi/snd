@@ -1,4 +1,36 @@
-import type { LineItem, Quote, Invoice } from "./types";
+import type { LineItem, Quote, Invoice, InvoiceStatus } from "./types";
+
+/**
+ * Display status for an invoice. "overdue" is derived from the due date rather
+ * than set by hand, so an unpaid invoice past its due date shows as overdue.
+ */
+export function effectiveInvoiceStatus(inv: {
+  status: InvoiceStatus;
+  dueDate?: string;
+}): InvoiceStatus {
+  if (inv.status === "paid") return "paid";
+  if (inv.dueDate) {
+    const due = localDate(inv.dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (due && due < today) return "overdue";
+  }
+  return "unpaid";
+}
+
+/**
+ * Parse a "YYYY-MM-DD" (or ISO) string as local-midnight on that calendar date.
+ * Avoids the UTC-vs-local off-by-one that `new Date("YYYY-MM-DD")` causes, since
+ * that parses as UTC midnight and can land on the previous day in negative offsets.
+ */
+function localDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
 
 /** Compute the total for a single line item based on its pricing type. */
 export function lineItemTotal(item: LineItem): number {

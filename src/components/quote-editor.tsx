@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, Eye, Printer, ReceiptText, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
-import type { InvoiceStatus } from "@/lib/types";
+import type { DocStatus } from "@/lib/types";
 import { documentTotals, formatCurrency } from "@/lib/calc";
 import { downloadElementAsPdf } from "@/lib/pdf";
 import { PageContainer } from "@/components/page";
@@ -14,6 +14,7 @@ import { DocumentView } from "@/components/document-view";
 import { CreateClientDialog } from "@/components/create-client-dialog";
 import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,38 +30,46 @@ import {
 
 const NONE = "__none__";
 
-const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  unpaid: "Unpaid",
-  paid: "Paid",
-  overdue: "Overdue",
+const STATUS_LABELS: Record<DocStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  accepted: "Accepted",
+  declined: "Declined",
 };
 
-export default function InvoiceEditorPage() {
-  const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const id = params.id;
+const STATUS_VARIANT: Record<
+  DocStatus,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  draft: "outline",
+  sent: "secondary",
+  accepted: "default",
+  declined: "destructive",
+};
 
-  const invoice = useStore((s) => s.invoices.find((i) => i.id === id));
+export function QuoteEditor({ id }: { id: string }) {
+  const router = useRouter();
+
+  const quote = useStore((s) => s.quotes.find((q) => q.id === id));
   const clients = useStore((s) => s.clients);
   const projects = useStore((s) => s.projects);
   const settings = useStore((s) => s.settings);
-  const updateInvoice = useStore((s) => s.updateInvoice);
+  const updateQuote = useStore((s) => s.updateQuote);
+  const invoiceFromQuote = useStore((s) => s.invoiceFromQuote);
 
   const docRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState("edit");
 
-  if (!invoice) {
+  if (!quote) {
     return (
       <PageContainer>
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Invoice not found.
+            Quote not found.
             <div className="mt-4">
-              <Button
-                variant="outline"
-                onClick={() => router.push("/invoices")}
-              >
-                Back to invoices
+              <Button variant="outline" onClick={() => router.push("/quotes")}>
+                Back to quotes
               </Button>
             </div>
           </CardContent>
@@ -69,13 +78,21 @@ export default function InvoiceEditorPage() {
     );
   }
 
-  const client = clients.find((c) => c.id === invoice.clientId);
-  const project = projects.find((p) => p.id === invoice.projectId);
+  const client = clients.find((c) => c.id === quote.clientId);
+  const project = projects.find((p) => p.id === quote.projectId);
   const bankAccount =
     settings.bankAccounts.find(
-      (b) => b.id === (invoice.bankAccountId ?? settings.defaultBankAccountId)
+      (b) => b.id === (quote.bankAccountId ?? settings.defaultBankAccountId)
     ) ?? settings.bankAccounts[0];
-  const totals = documentTotals(invoice);
+  const totals = documentTotals(quote);
+
+  function convertToInvoice() {
+    const inv = invoiceFromQuote(quote!.id);
+    if (inv) {
+      toast.success(`Created invoice ${inv.number}`);
+      router.push(`/invoices/edit?id=${inv.id}`);
+    }
+  }
 
   async function downloadPdf() {
     const el = docRef.current?.querySelector(".print-area") as
@@ -84,7 +101,7 @@ export default function InvoiceEditorPage() {
     if (!el) return;
     setDownloading(true);
     try {
-      await downloadElementAsPdf(el, `${invoice!.number}.pdf`);
+      await downloadElementAsPdf(el, `${quote!.number}.pdf`);
     } catch {
       toast.error("Could not generate PDF. Try the print option instead.");
     } finally {
@@ -98,16 +115,18 @@ export default function InvoiceEditorPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/invoices")}
+          onClick={() => router.push("/quotes")}
         >
-          <ArrowLeft className="size-4" /> Invoices
+          <ArrowLeft className="size-4" /> Quotes
         </Button>
-        <span className="font-mono text-sm text-muted-foreground">
-          {invoice.number}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm text-muted-foreground">
+            {quote.number}
+          </span>
+        </div>
       </div>
 
-      <Tabs defaultValue="edit">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="no-print mb-4">
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview & print</TabsTrigger>
@@ -123,9 +142,9 @@ export default function InvoiceEditorPage() {
                 <Label>Client</Label>
                 <div className="flex gap-2">
                   <Select
-                    value={invoice.clientId ?? NONE}
+                    value={quote.clientId ?? NONE}
                     onValueChange={(v) =>
-                      updateInvoice(invoice.id, {
+                      updateQuote(quote.id, {
                         clientId: v === NONE ? undefined : v,
                       })
                     }
@@ -143,9 +162,7 @@ export default function InvoiceEditorPage() {
                     </SelectContent>
                   </Select>
                   <CreateClientDialog
-                    onCreated={(id) =>
-                      updateInvoice(invoice.id, { clientId: id })
-                    }
+                    onCreated={(id) => updateQuote(quote.id, { clientId: id })}
                   />
                 </div>
               </div>
@@ -153,9 +170,9 @@ export default function InvoiceEditorPage() {
                 <Label>Project</Label>
                 <div className="flex gap-2">
                   <Select
-                    value={invoice.projectId ?? NONE}
+                    value={quote.projectId ?? NONE}
                     onValueChange={(v) =>
-                      updateInvoice(invoice.id, {
+                      updateQuote(quote.id, {
                         projectId: v === NONE ? undefined : v,
                       })
                     }
@@ -173,9 +190,9 @@ export default function InvoiceEditorPage() {
                     </SelectContent>
                   </Select>
                   <CreateProjectDialog
-                    clientId={invoice.clientId}
+                    clientId={quote.clientId}
                     onCreated={(id) =>
-                      updateInvoice(invoice.id, { projectId: id })
+                      updateQuote(quote.id, { projectId: id })
                     }
                   />
                 </div>
@@ -184,13 +201,13 @@ export default function InvoiceEditorPage() {
                 <Label>Bank account (shown on document)</Label>
                 <Select
                   value={
-                    invoice.bankAccountId ??
+                    quote.bankAccountId ??
                     settings.defaultBankAccountId ??
                     settings.bankAccounts[0]?.id ??
                     NONE
                   }
                   onValueChange={(v) =>
-                    updateInvoice(invoice.id, {
+                    updateQuote(quote.id, {
                       bankAccountId: v === NONE ? undefined : v,
                     })
                   }
@@ -208,44 +225,82 @@ export default function InvoiceEditorPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date">Invoice date</Label>
+                <Label htmlFor="date">Date</Label>
                 <Input
                   id="date"
                   type="date"
-                  value={invoice.date}
+                  value={quote.date}
                   onChange={(e) =>
-                    updateInvoice(invoice.id, { date: e.target.value })
+                    updateQuote(quote.id, { date: e.target.value })
                   }
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="due">Due date</Label>
+                <Label htmlFor="valid">Valid until</Label>
                 <Input
-                  id="due"
+                  id="valid"
                   type="date"
-                  value={invoice.dueDate ?? ""}
+                  value={quote.validUntil ?? ""}
                   onChange={(e) =>
-                    updateInvoice(invoice.id, { dueDate: e.target.value })
+                    updateQuote(quote.id, { validUntil: e.target.value })
                   }
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 sm:col-span-2">
                 <Label>Status</Label>
-                <Select
-                  value={invoice.status}
-                  onValueChange={(v) =>
-                    updateInvoice(invoice.id, { status: v as InvoiceStatus })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unpaid">Unpaid</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={STATUS_VARIANT[quote.status]}>
+                    {STATUS_LABELS[quote.status]}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {quote.status === "draft" && "Still being prepared."}
+                    {quote.status === "sent" && "Sent to client — awaiting reply."}
+                    {quote.status === "accepted" && "Client accepted this quote."}
+                    {quote.status === "declined" && "Client declined this quote."}
+                  </span>
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    {quote.status === "draft" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateQuote(quote.id, { status: "sent" })}
+                      >
+                        Mark as sent
+                      </Button>
+                    )}
+                    {quote.status === "sent" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            updateQuote(quote.id, { status: "accepted" })
+                          }
+                        >
+                          Mark accepted
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            updateQuote(quote.id, { status: "declined" })
+                          }
+                        >
+                          Mark declined
+                        </Button>
+                      </>
+                    )}
+                    {(quote.status === "accepted" ||
+                      quote.status === "declined") && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => updateQuote(quote.id, { status: "draft" })}
+                      >
+                        Reopen as draft
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -256,8 +311,8 @@ export default function InvoiceEditorPage() {
             </CardHeader>
             <CardContent>
               <LineItemsEditor
-                items={invoice.items}
-                onChange={(items) => updateInvoice(invoice.id, { items })}
+                items={quote.items}
+                onChange={(items) => updateQuote(quote.id, { items })}
                 currencySymbol={settings.currencySymbol}
               />
             </CardContent>
@@ -273,16 +328,14 @@ export default function InvoiceEditorPage() {
                   <input
                     type="checkbox"
                     className="size-4 accent-primary"
-                    checked={invoice.vatEnabled}
+                    checked={quote.vatEnabled}
                     onChange={(e) =>
-                      updateInvoice(invoice.id, {
-                        vatEnabled: e.target.checked,
-                      })
+                      updateQuote(quote.id, { vatEnabled: e.target.checked })
                     }
                   />
                   Add VAT
                 </label>
-                {invoice.vatEnabled && (
+                {quote.vatEnabled && (
                   <div className="flex items-center gap-2">
                     <Label htmlFor="vatrate" className="text-sm">
                       VAT %
@@ -291,9 +344,9 @@ export default function InvoiceEditorPage() {
                       id="vatrate"
                       type="number"
                       className="w-20"
-                      value={Math.round(invoice.vatRate * 100)}
+                      value={Math.round(quote.vatRate * 100)}
                       onChange={(e) =>
-                        updateInvoice(invoice.id, {
+                        updateQuote(quote.id, {
                           vatRate: Number(e.target.value) / 100,
                         })
                       }
@@ -312,9 +365,9 @@ export default function InvoiceEditorPage() {
                 <Textarea
                   id="terms"
                   rows={2}
-                  value={invoice.terms ?? ""}
+                  value={quote.terms ?? ""}
                   onChange={(e) =>
-                    updateInvoice(invoice.id, { terms: e.target.value })
+                    updateQuote(quote.id, { terms: e.target.value })
                   }
                 />
               </div>
@@ -323,18 +376,49 @@ export default function InvoiceEditorPage() {
                 <Textarea
                   id="notes"
                   rows={2}
-                  value={invoice.notes ?? ""}
+                  value={quote.notes ?? ""}
                   onChange={(e) =>
-                    updateInvoice(invoice.id, { notes: e.target.value })
+                    updateQuote(quote.id, { notes: e.target.value })
                   }
                 />
               </div>
             </CardContent>
           </Card>
+
+          <div className="no-print flex flex-wrap justify-end gap-2">
+            {quote.status === "draft" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updateQuote(quote.id, { status: "sent" });
+                  toast.success("Quote marked as sent.");
+                }}
+              >
+                <Send className="size-4" /> Mark as sent
+              </Button>
+            )}
+            <Button onClick={() => setTab("preview")}>
+              <Eye className="size-4" /> Preview & print
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="preview">
           <div className="no-print mb-4 flex flex-wrap justify-end gap-2">
+            {quote.status === "draft" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updateQuote(quote.id, { status: "sent" });
+                  toast.success("Quote marked as sent.");
+                }}
+              >
+                <Send className="size-4" /> Mark as sent
+              </Button>
+            )}
+            <Button variant="outline" onClick={convertToInvoice}>
+              <ReceiptText className="size-4" /> Convert to invoice
+            </Button>
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="size-4" /> Print
             </Button>
@@ -353,17 +437,16 @@ export default function InvoiceEditorPage() {
               project={project}
               bankAccount={bankAccount}
               doc={{
-                kind: "invoice",
-                number: invoice.number,
-                date: invoice.date,
-                secondaryDateLabel: "Due date",
-                secondaryDate: invoice.dueDate,
-                statusLabel: STATUS_LABELS[invoice.status],
-                items: invoice.items,
-                vatEnabled: invoice.vatEnabled,
-                vatRate: invoice.vatRate,
-                notes: invoice.notes,
-                terms: invoice.terms,
+                kind: "quote",
+                number: quote.number,
+                date: quote.date,
+                secondaryDateLabel: "Valid until",
+                secondaryDate: quote.validUntil,
+                items: quote.items,
+                vatEnabled: quote.vatEnabled,
+                vatRate: quote.vatRate,
+                notes: quote.notes,
+                terms: quote.terms,
               }}
             />
           </div>

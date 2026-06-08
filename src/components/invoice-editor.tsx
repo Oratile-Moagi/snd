@@ -1,12 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Printer, ReceiptText } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, Eye, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
-import type { DocStatus } from "@/lib/types";
-import { documentTotals, formatCurrency } from "@/lib/calc";
+import type { InvoiceStatus } from "@/lib/types";
+import {
+  documentTotals,
+  effectiveInvoiceStatus,
+  formatCurrency,
+} from "@/lib/calc";
 import { downloadElementAsPdf } from "@/lib/pdf";
 import { PageContainer } from "@/components/page";
 import { LineItemsEditor } from "@/components/line-items-editor";
@@ -14,6 +18,7 @@ import { DocumentView } from "@/components/document-view";
 import { CreateClientDialog } from "@/components/create-client-dialog";
 import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,30 +34,37 @@ import {
 
 const NONE = "__none__";
 
-export default function QuoteEditorPage() {
-  const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const id = params.id;
+const STATUS_LABELS: Record<InvoiceStatus, string> = {
+  unpaid: "Unpaid",
+  paid: "Paid",
+  overdue: "Overdue",
+};
 
-  const quote = useStore((s) => s.quotes.find((q) => q.id === id));
+export function InvoiceEditor({ id }: { id: string }) {
+  const router = useRouter();
+
+  const invoice = useStore((s) => s.invoices.find((i) => i.id === id));
   const clients = useStore((s) => s.clients);
   const projects = useStore((s) => s.projects);
   const settings = useStore((s) => s.settings);
-  const updateQuote = useStore((s) => s.updateQuote);
-  const invoiceFromQuote = useStore((s) => s.invoiceFromQuote);
+  const updateInvoice = useStore((s) => s.updateInvoice);
 
   const docRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState("edit");
 
-  if (!quote) {
+  if (!invoice) {
     return (
       <PageContainer>
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Quote not found.
+            Invoice not found.
             <div className="mt-4">
-              <Button variant="outline" onClick={() => router.push("/quotes")}>
-                Back to quotes
+              <Button
+                variant="outline"
+                onClick={() => router.push("/invoices")}
+              >
+                Back to invoices
               </Button>
             </div>
           </CardContent>
@@ -61,21 +73,13 @@ export default function QuoteEditorPage() {
     );
   }
 
-  const client = clients.find((c) => c.id === quote.clientId);
-  const project = projects.find((p) => p.id === quote.projectId);
+  const client = clients.find((c) => c.id === invoice.clientId);
+  const project = projects.find((p) => p.id === invoice.projectId);
   const bankAccount =
     settings.bankAccounts.find(
-      (b) => b.id === (quote.bankAccountId ?? settings.defaultBankAccountId)
+      (b) => b.id === (invoice.bankAccountId ?? settings.defaultBankAccountId)
     ) ?? settings.bankAccounts[0];
-  const totals = documentTotals(quote);
-
-  function convertToInvoice() {
-    const inv = invoiceFromQuote(quote!.id);
-    if (inv) {
-      toast.success(`Created invoice ${inv.number}`);
-      router.push(`/invoices/${inv.id}`);
-    }
-  }
+  const totals = documentTotals(invoice);
 
   async function downloadPdf() {
     const el = docRef.current?.querySelector(".print-area") as
@@ -84,7 +88,7 @@ export default function QuoteEditorPage() {
     if (!el) return;
     setDownloading(true);
     try {
-      await downloadElementAsPdf(el, `${quote!.number}.pdf`);
+      await downloadElementAsPdf(el, `${invoice!.number}.pdf`);
     } catch {
       toast.error("Could not generate PDF. Try the print option instead.");
     } finally {
@@ -98,18 +102,16 @@ export default function QuoteEditorPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/quotes")}
+          onClick={() => router.push("/invoices")}
         >
-          <ArrowLeft className="size-4" /> Quotes
+          <ArrowLeft className="size-4" /> Invoices
         </Button>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-muted-foreground">
-            {quote.number}
-          </span>
-        </div>
+        <span className="font-mono text-sm text-muted-foreground">
+          {invoice.number}
+        </span>
       </div>
 
-      <Tabs defaultValue="edit">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="no-print mb-4">
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview & print</TabsTrigger>
@@ -125,9 +127,9 @@ export default function QuoteEditorPage() {
                 <Label>Client</Label>
                 <div className="flex gap-2">
                   <Select
-                    value={quote.clientId ?? NONE}
+                    value={invoice.clientId ?? NONE}
                     onValueChange={(v) =>
-                      updateQuote(quote.id, {
+                      updateInvoice(invoice.id, {
                         clientId: v === NONE ? undefined : v,
                       })
                     }
@@ -145,7 +147,9 @@ export default function QuoteEditorPage() {
                     </SelectContent>
                   </Select>
                   <CreateClientDialog
-                    onCreated={(id) => updateQuote(quote.id, { clientId: id })}
+                    onCreated={(id) =>
+                      updateInvoice(invoice.id, { clientId: id })
+                    }
                   />
                 </div>
               </div>
@@ -153,9 +157,9 @@ export default function QuoteEditorPage() {
                 <Label>Project</Label>
                 <div className="flex gap-2">
                   <Select
-                    value={quote.projectId ?? NONE}
+                    value={invoice.projectId ?? NONE}
                     onValueChange={(v) =>
-                      updateQuote(quote.id, {
+                      updateInvoice(invoice.id, {
                         projectId: v === NONE ? undefined : v,
                       })
                     }
@@ -173,9 +177,9 @@ export default function QuoteEditorPage() {
                     </SelectContent>
                   </Select>
                   <CreateProjectDialog
-                    clientId={quote.clientId}
+                    clientId={invoice.clientId}
                     onCreated={(id) =>
-                      updateQuote(quote.id, { projectId: id })
+                      updateInvoice(invoice.id, { projectId: id })
                     }
                   />
                 </div>
@@ -184,13 +188,13 @@ export default function QuoteEditorPage() {
                 <Label>Bank account (shown on document)</Label>
                 <Select
                   value={
-                    quote.bankAccountId ??
+                    invoice.bankAccountId ??
                     settings.defaultBankAccountId ??
                     settings.bankAccounts[0]?.id ??
                     NONE
                   }
                   onValueChange={(v) =>
-                    updateQuote(quote.id, {
+                    updateInvoice(invoice.id, {
                       bankAccountId: v === NONE ? undefined : v,
                     })
                   }
@@ -208,45 +212,71 @@ export default function QuoteEditorPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">Invoice date</Label>
                 <Input
                   id="date"
                   type="date"
-                  value={quote.date}
+                  value={invoice.date}
                   onChange={(e) =>
-                    updateQuote(quote.id, { date: e.target.value })
+                    updateInvoice(invoice.id, { date: e.target.value })
                   }
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="valid">Valid until</Label>
+                <Label htmlFor="due">Due date</Label>
                 <Input
-                  id="valid"
+                  id="due"
                   type="date"
-                  value={quote.validUntil ?? ""}
+                  value={invoice.dueDate ?? ""}
                   onChange={(e) =>
-                    updateQuote(quote.id, { validUntil: e.target.value })
+                    updateInvoice(invoice.id, { dueDate: e.target.value })
                   }
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 sm:col-span-2">
                 <Label>Status</Label>
-                <Select
-                  value={quote.status}
-                  onValueChange={(v) =>
-                    updateQuote(quote.id, { status: v as DocStatus })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="accepted">Accepted</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={
+                      effectiveInvoiceStatus(invoice) === "paid"
+                        ? "default"
+                        : effectiveInvoiceStatus(invoice) === "overdue"
+                        ? "destructive"
+                        : "secondary"
+                    }
+                  >
+                    {STATUS_LABELS[effectiveInvoiceStatus(invoice)]}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {invoice.status === "paid"
+                      ? "Marked as paid."
+                      : effectiveInvoiceStatus(invoice) === "overdue"
+                      ? "Past due date — still unpaid."
+                      : "Awaiting payment."}
+                  </span>
+                  <div className="ml-auto">
+                    {invoice.status === "paid" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          updateInvoice(invoice.id, { status: "unpaid" })
+                        }
+                      >
+                        Mark as unpaid
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          updateInvoice(invoice.id, { status: "paid" })
+                        }
+                      >
+                        Mark as paid
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -257,8 +287,8 @@ export default function QuoteEditorPage() {
             </CardHeader>
             <CardContent>
               <LineItemsEditor
-                items={quote.items}
-                onChange={(items) => updateQuote(quote.id, { items })}
+                items={invoice.items}
+                onChange={(items) => updateInvoice(invoice.id, { items })}
                 currencySymbol={settings.currencySymbol}
               />
             </CardContent>
@@ -274,14 +304,16 @@ export default function QuoteEditorPage() {
                   <input
                     type="checkbox"
                     className="size-4 accent-primary"
-                    checked={quote.vatEnabled}
+                    checked={invoice.vatEnabled}
                     onChange={(e) =>
-                      updateQuote(quote.id, { vatEnabled: e.target.checked })
+                      updateInvoice(invoice.id, {
+                        vatEnabled: e.target.checked,
+                      })
                     }
                   />
                   Add VAT
                 </label>
-                {quote.vatEnabled && (
+                {invoice.vatEnabled && (
                   <div className="flex items-center gap-2">
                     <Label htmlFor="vatrate" className="text-sm">
                       VAT %
@@ -290,9 +322,9 @@ export default function QuoteEditorPage() {
                       id="vatrate"
                       type="number"
                       className="w-20"
-                      value={Math.round(quote.vatRate * 100)}
+                      value={Math.round(invoice.vatRate * 100)}
                       onChange={(e) =>
-                        updateQuote(quote.id, {
+                        updateInvoice(invoice.id, {
                           vatRate: Number(e.target.value) / 100,
                         })
                       }
@@ -311,9 +343,9 @@ export default function QuoteEditorPage() {
                 <Textarea
                   id="terms"
                   rows={2}
-                  value={quote.terms ?? ""}
+                  value={invoice.terms ?? ""}
                   onChange={(e) =>
-                    updateQuote(quote.id, { terms: e.target.value })
+                    updateInvoice(invoice.id, { terms: e.target.value })
                   }
                 />
               </div>
@@ -322,21 +354,24 @@ export default function QuoteEditorPage() {
                 <Textarea
                   id="notes"
                   rows={2}
-                  value={quote.notes ?? ""}
+                  value={invoice.notes ?? ""}
                   onChange={(e) =>
-                    updateQuote(quote.id, { notes: e.target.value })
+                    updateInvoice(invoice.id, { notes: e.target.value })
                   }
                 />
               </div>
             </CardContent>
           </Card>
+
+          <div className="no-print flex justify-end">
+            <Button onClick={() => setTab("preview")}>
+              <Eye className="size-4" /> Preview & print
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="preview">
           <div className="no-print mb-4 flex flex-wrap justify-end gap-2">
-            <Button variant="outline" onClick={convertToInvoice}>
-              <ReceiptText className="size-4" /> Convert to invoice
-            </Button>
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="size-4" /> Print
             </Button>
@@ -355,16 +390,17 @@ export default function QuoteEditorPage() {
               project={project}
               bankAccount={bankAccount}
               doc={{
-                kind: "quote",
-                number: quote.number,
-                date: quote.date,
-                secondaryDateLabel: "Valid until",
-                secondaryDate: quote.validUntil,
-                items: quote.items,
-                vatEnabled: quote.vatEnabled,
-                vatRate: quote.vatRate,
-                notes: quote.notes,
-                terms: quote.terms,
+                kind: "invoice",
+                number: invoice.number,
+                date: invoice.date,
+                secondaryDateLabel: "Due date",
+                secondaryDate: invoice.dueDate,
+                statusLabel: STATUS_LABELS[effectiveInvoiceStatus(invoice)],
+                items: invoice.items,
+                vatEnabled: invoice.vatEnabled,
+                vatRate: invoice.vatRate,
+                notes: invoice.notes,
+                terms: invoice.terms,
               }}
             />
           </div>
