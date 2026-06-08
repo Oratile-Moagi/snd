@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Printer, ReceiptText } from "lucide-react";
+import { ArrowLeft, Download, Eye, Printer, ReceiptText, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { DocStatus } from "@/lib/types";
@@ -59,6 +59,7 @@ export function QuoteEditor({ id }: { id: string }) {
 
   const docRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState("edit");
 
   if (!quote) {
     return (
@@ -125,7 +126,7 @@ export function QuoteEditor({ id }: { id: string }) {
         </div>
       </div>
 
-      <Tabs defaultValue="edit">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="no-print mb-4">
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview & print</TabsTrigger>
@@ -383,10 +384,38 @@ export function QuoteEditor({ id }: { id: string }) {
               </div>
             </CardContent>
           </Card>
+
+          <div className="no-print flex flex-wrap justify-end gap-2">
+            {quote.status === "draft" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updateQuote(quote.id, { status: "sent" });
+                  toast.success("Quote marked as sent.");
+                }}
+              >
+                <Send className="size-4" /> Mark as sent
+              </Button>
+            )}
+            <Button onClick={() => setTab("preview")}>
+              <Eye className="size-4" /> Preview & print
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="preview">
           <div className="no-print mb-4 flex flex-wrap justify-end gap-2">
+            {quote.status === "draft" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updateQuote(quote.id, { status: "sent" });
+                  toast.success("Quote marked as sent.");
+                }}
+              >
+                <Send className="size-4" /> Mark as sent
+              </Button>
+            )}
             <Button variant="outline" onClick={convertToInvoice}>
               <ReceiptText className="size-4" /> Convert to invoice
             </Button>

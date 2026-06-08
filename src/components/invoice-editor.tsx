@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Download, Eye, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { InvoiceStatus } from "@/lib/types";
@@ -51,6 +51,7 @@ export function InvoiceEditor({ id }: { id: string }) {
 
   const docRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState("edit");
 
   if (!invoice) {
     return (
@@ -110,7 +111,7 @@ export function InvoiceEditor({ id }: { id: string }) {
         </span>
       </div>
 
-      <Tabs defaultValue="edit">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="no-print mb-4">
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview & print</TabsTrigger>
@@ -361,6 +362,12 @@ export function InvoiceEditor({ id }: { id: string }) {
               </div>
             </CardContent>
           </Card>
+
+          <div className="no-print flex justify-end">
+            <Button onClick={() => setTab("preview")}>
+              <Eye className="size-4" /> Preview & print
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="preview">

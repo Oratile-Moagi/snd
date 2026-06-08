@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, FileText, Trash2 } from "lucide-react";
+import { Plus, FileText, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { DocStatus } from "@/lib/types";
@@ -11,6 +11,12 @@ import { PageContainer, PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -44,6 +50,14 @@ export default function QuotesPage() {
   const settings = useStore((s) => s.settings);
   const addQuote = useStore((s) => s.addQuote);
   const deleteQuote = useStore((s) => s.deleteQuote);
+  const updateQuote = useStore((s) => s.updateQuote);
+
+  const NEXT_STATUSES: Record<DocStatus, DocStatus[]> = {
+    draft: ["sent"],
+    sent: ["accepted", "declined", "draft"],
+    accepted: ["draft"],
+    declined: ["draft"],
+  };
 
   function clientName(id?: string) {
     const c = clients.find((x) => x.id === id);
@@ -116,10 +130,40 @@ export default function QuotesPage() {
                       </TableCell>
                       <TableCell>{clientName(q.clientId)}</TableCell>
                       <TableCell>{formatDate(q.date)}</TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANT[q.status]}>
-                          {STATUS_LABELS[q.status]}
-                        </Badge>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label="Change status"
+                            >
+                              <Badge variant={STATUS_VARIANT[q.status]}>
+                                {STATUS_LABELS[q.status]}
+                              </Badge>
+                              <ChevronDown className="size-3.5 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            {NEXT_STATUSES[q.status].map((next) => (
+                              <DropdownMenuItem
+                                key={next}
+                                onClick={() => {
+                                  updateQuote(q.id, { status: next });
+                                  toast.success(
+                                    next === "draft"
+                                      ? "Reopened as draft."
+                                      : `Marked ${STATUS_LABELS[next].toLowerCase()}.`
+                                  );
+                                }}
+                              >
+                                {next === "draft"
+                                  ? "Reopen as draft"
+                                  : `Mark ${STATUS_LABELS[next].toLowerCase()}`}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {formatCurrency(totals.total, settings.currencySymbol)}
