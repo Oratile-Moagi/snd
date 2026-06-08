@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Printer, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
@@ -14,6 +14,7 @@ import { DocumentView } from "@/components/document-view";
 import { CreateClientDialog } from "@/components/create-client-dialog";
 import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,10 +30,25 @@ import {
 
 const NONE = "__none__";
 
-export default function QuoteEditorPage() {
-  const params = useParams<{ id: string }>();
+const STATUS_LABELS: Record<DocStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  accepted: "Accepted",
+  declined: "Declined",
+};
+
+const STATUS_VARIANT: Record<
+  DocStatus,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  draft: "outline",
+  sent: "secondary",
+  accepted: "default",
+  declined: "destructive",
+};
+
+export function QuoteEditor({ id }: { id: string }) {
   const router = useRouter();
-  const id = params.id;
 
   const quote = useStore((s) => s.quotes.find((q) => q.id === id));
   const clients = useStore((s) => s.clients);
@@ -73,7 +89,7 @@ export default function QuoteEditorPage() {
     const inv = invoiceFromQuote(quote!.id);
     if (inv) {
       toast.success(`Created invoice ${inv.number}`);
-      router.push(`/invoices/${inv.id}`);
+      router.push(`/invoices/edit?id=${inv.id}`);
     }
   }
 
@@ -229,24 +245,61 @@ export default function QuoteEditorPage() {
                   }
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 sm:col-span-2">
                 <Label>Status</Label>
-                <Select
-                  value={quote.status}
-                  onValueChange={(v) =>
-                    updateQuote(quote.id, { status: v as DocStatus })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="accepted">Accepted</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={STATUS_VARIANT[quote.status]}>
+                    {STATUS_LABELS[quote.status]}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {quote.status === "draft" && "Still being prepared."}
+                    {quote.status === "sent" && "Sent to client — awaiting reply."}
+                    {quote.status === "accepted" && "Client accepted this quote."}
+                    {quote.status === "declined" && "Client declined this quote."}
+                  </span>
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    {quote.status === "draft" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateQuote(quote.id, { status: "sent" })}
+                      >
+                        Mark as sent
+                      </Button>
+                    )}
+                    {quote.status === "sent" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            updateQuote(quote.id, { status: "accepted" })
+                          }
+                        >
+                          Mark accepted
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            updateQuote(quote.id, { status: "declined" })
+                          }
+                        >
+                          Mark declined
+                        </Button>
+                      </>
+                    )}
+                    {(quote.status === "accepted" ||
+                      quote.status === "declined") && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => updateQuote(quote.id, { status: "draft" })}
+                      >
+                        Reopen as draft
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

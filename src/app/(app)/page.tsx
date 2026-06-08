@@ -44,7 +44,7 @@ export default function DashboardPage() {
       vatRate: settings.defaultVatRate,
       terms: settings.defaultTerms,
     });
-    router.push(`/quotes/${q.id}`);
+    router.push(`/quotes/edit?id=${q.id}`);
   }
 
   function createInvoice() {
@@ -58,7 +58,7 @@ export default function DashboardPage() {
       terms: settings.defaultTerms,
       amountPaid: 0,
     });
-    router.push(`/invoices/${inv.id}`);
+    router.push(`/invoices/edit?id=${inv.id}`);
   }
 
   const cur = settings.currencySymbol;
@@ -184,7 +184,7 @@ export default function DashboardPage() {
                 {quotes.slice(0, 5).map((q) => (
                   <li key={q.id}>
                     <Link
-                      href={`/quotes/${q.id}`}
+                      href={`/quotes/edit?id=${q.id}`}
                       className="flex items-center justify-between gap-3 py-2.5 text-sm hover:opacity-80"
                     >
                       <div className="min-w-0">
@@ -228,7 +228,7 @@ export default function DashboardPage() {
                 {invoices.slice(0, 5).map((inv) => (
                   <li key={inv.id}>
                     <Link
-                      href={`/invoices/${inv.id}`}
+                      href={`/invoices/edit?id=${inv.id}`}
                       className="flex items-center justify-between gap-3 py-2.5 text-sm hover:opacity-80"
                     >
                       <div className="min-w-0">

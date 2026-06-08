@@ -1,4 +1,22 @@
-import type { LineItem, Quote, Invoice } from "./types";
+import type { LineItem, Quote, Invoice, InvoiceStatus } from "./types";
+
+/**
+ * Display status for an invoice. "overdue" is derived from the due date rather
+ * than set by hand, so an unpaid invoice past its due date shows as overdue.
+ */
+export function effectiveInvoiceStatus(inv: {
+  status: InvoiceStatus;
+  dueDate?: string;
+}): InvoiceStatus {
+  if (inv.status === "paid") return "paid";
+  if (inv.dueDate) {
+    const due = new Date(inv.dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(due.getTime()) && due < today) return "overdue";
+  }
+  return "unpaid";
+}
 
 /** Compute the total for a single line item based on its pricing type. */
 export function lineItemTotal(item: LineItem): number {

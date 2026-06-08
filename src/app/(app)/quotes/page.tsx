@@ -60,7 +60,7 @@ export default function QuotesPage() {
       vatRate: settings.defaultVatRate,
       terms: settings.defaultTerms,
     });
-    router.push(`/quotes/${q.id}`);
+    router.push(`/quotes/edit?id=${q.id}`);
   }
 
   return (
@@ -103,11 +103,11 @@ export default function QuotesPage() {
                     <TableRow
                       key={q.id}
                       className="cursor-pointer"
-                      onClick={() => router.push(`/quotes/${q.id}`)}
+                      onClick={() => router.push(`/quotes/edit?id=${q.id}`)}
                     >
                       <TableCell className="font-mono font-medium">
                         <Link
-                          href={`/quotes/${q.id}`}
+                          href={`/quotes/edit?id=${q.id}`}
                           className="hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >

@@ -8,6 +8,7 @@ import { useStore } from "@/lib/store";
 import type { InvoiceStatus } from "@/lib/types";
 import {
   documentTotals,
+  effectiveInvoiceStatus,
   formatCurrency,
   formatDate,
   todayISO,
@@ -65,7 +66,7 @@ export default function InvoicesPage() {
       terms: settings.defaultTerms,
       amountPaid: 0,
     });
-    router.push(`/invoices/${inv.id}`);
+    router.push(`/invoices/edit?id=${inv.id}`);
   }
 
   return (
@@ -105,15 +106,16 @@ export default function InvoicesPage() {
               <TableBody>
                 {invoices.map((inv) => {
                   const totals = documentTotals(inv);
+                  const status = effectiveInvoiceStatus(inv);
                   return (
                     <TableRow
                       key={inv.id}
                       className="cursor-pointer"
-                      onClick={() => router.push(`/invoices/${inv.id}`)}
+                      onClick={() => router.push(`/invoices/edit?id=${inv.id}`)}
                     >
                       <TableCell className="font-mono font-medium">
                         <Link
-                          href={`/invoices/${inv.id}`}
+                          href={`/invoices/edit?id=${inv.id}`}
                           className="hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -124,8 +126,8 @@ export default function InvoicesPage() {
                       <TableCell>{formatDate(inv.date)}</TableCell>
                       <TableCell>{formatDate(inv.dueDate)}</TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[inv.status]}>
-                          {STATUS_LABELS[inv.status]}
+                        <Badge variant={STATUS_VARIANT[status]}>
+                          {STATUS_LABELS[status]}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">

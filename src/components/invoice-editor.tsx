@@ -1,12 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { InvoiceStatus } from "@/lib/types";
-import { documentTotals, formatCurrency } from "@/lib/calc";
+import {
+  documentTotals,
+  effectiveInvoiceStatus,
+  formatCurrency,
+} from "@/lib/calc";
 import { downloadElementAsPdf } from "@/lib/pdf";
 import { PageContainer } from "@/components/page";
 import { LineItemsEditor } from "@/components/line-items-editor";
@@ -14,6 +18,7 @@ import { DocumentView } from "@/components/document-view";
 import { CreateClientDialog } from "@/components/create-client-dialog";
 import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,10 +40,8 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   overdue: "Overdue",
 };
 
-export default function InvoiceEditorPage() {
-  const params = useParams<{ id: string }>();
+export function InvoiceEditor({ id }: { id: string }) {
   const router = useRouter();
-  const id = params.id;
 
   const invoice = useStore((s) => s.invoices.find((i) => i.id === id));
   const clients = useStore((s) => s.clients);
@@ -229,23 +232,50 @@ export default function InvoiceEditorPage() {
                   }
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 sm:col-span-2">
                 <Label>Status</Label>
-                <Select
-                  value={invoice.status}
-                  onValueChange={(v) =>
-                    updateInvoice(invoice.id, { status: v as InvoiceStatus })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unpaid">Unpaid</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={
+                      effectiveInvoiceStatus(invoice) === "paid"
+                        ? "default"
+                        : effectiveInvoiceStatus(invoice) === "overdue"
+                        ? "destructive"
+                        : "secondary"
+                    }
+                  >
+                    {STATUS_LABELS[effectiveInvoiceStatus(invoice)]}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {invoice.status === "paid"
+                      ? "Marked as paid."
+                      : effectiveInvoiceStatus(invoice) === "overdue"
+                      ? "Past due date — still unpaid."
+                      : "Awaiting payment."}
+                  </span>
+                  <div className="ml-auto">
+                    {invoice.status === "paid" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          updateInvoice(invoice.id, { status: "unpaid" })
+                        }
+                      >
+                        Mark as unpaid
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          updateInvoice(invoice.id, { status: "paid" })
+                        }
+                      >
+                        Mark as paid
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -358,7 +388,7 @@ export default function InvoiceEditorPage() {
                 date: invoice.date,
                 secondaryDateLabel: "Due date",
                 secondaryDate: invoice.dueDate,
-                statusLabel: STATUS_LABELS[invoice.status],
+                statusLabel: STATUS_LABELS[effectiveInvoiceStatus(invoice)],
                 items: invoice.items,
                 vatEnabled: invoice.vatEnabled,
                 vatRate: invoice.vatRate,

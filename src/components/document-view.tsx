@@ -112,9 +112,8 @@ export function DocumentView({
         </div>
       </div>
 
-      {/* Body — vertically centered so content fills the page evenly */}
-      <div className="flex flex-1 flex-col px-10 print:flex-none">
-        <div className="my-auto w-full space-y-12 py-10 print:my-0">
+      {/* Body — flows top-down so multi-page documents don't clutter */}
+      <div className="w-full space-y-9 px-10 pt-8">
       {/* Bank details + Bill to */}
       <div className="grid grid-cols-2 gap-8">
         {bank ? (
@@ -286,11 +285,10 @@ export function DocumentView({
           </div>
         )}
       </div>
-        </div>
       </div>
 
       {/* Footer contact pill */}
-      <div className="px-10 pb-10 pt-6">
+      <div className="mt-auto px-10 pb-10 pt-8">
         <div
           className="flex flex-wrap items-center justify-around gap-4 rounded-full px-8 py-4 text-sm text-white"
           style={{

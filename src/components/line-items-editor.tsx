@@ -1,12 +1,13 @@
 "use client";
 
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, Wrench } from "lucide-react";
 import {
   LINE_ITEM_TYPE_LABELS,
   type LineItem,
   type LineItemType,
 } from "@/lib/types";
 import { lineItemTotal, formatCurrency } from "@/lib/calc";
+import { EquipmentPickerDialog } from "@/components/equipment-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,16 @@ function newItem(): LineItem {
   };
 }
 
+function newEstablishment(): LineItem {
+  return {
+    id: `li-${Math.random().toString(36).slice(2, 9)}`,
+    description: "Establishment / mobilisation to site",
+    type: "fixed",
+    rate: 0,
+    quantity: 1,
+  };
+}
+
 export function LineItemsEditor({
   items,
   onChange,
@@ -48,6 +59,9 @@ export function LineItemsEditor({
   function add() {
     onChange([...items, newItem()]);
   }
+  function addEstablishment() {
+    onChange([...items, newEstablishment()]);
+  }
 
   return (
     <div className="space-y-3">
@@ -64,13 +78,29 @@ export function LineItemsEditor({
               <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
                 <div className="grid gap-1.5">
                   <Label className="text-xs">Description</Label>
-                  <Input
-                    placeholder="e.g. Tipper truck hire"
-                    value={item.description}
-                    onChange={(e) =>
-                      update(item.id, { description: e.target.value })
-                    }
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      className="flex-1"
+                      placeholder="e.g. Tipper truck hire"
+                      value={item.description}
+                      onChange={(e) =>
+                        update(item.id, {
+                          description: e.target.value,
+                          equipmentId: undefined,
+                        })
+                      }
+                    />
+                    <EquipmentPickerDialog
+                      onPick={(p) =>
+                        update(item.id, {
+                          description: p.description,
+                          equipmentId: p.equipmentId,
+                          ...(p.rate !== undefined ? { rate: p.rate } : {}),
+                          ...(p.type ? { type: p.type } : {}),
+                        })
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="text-xs">Pricing</Label>
@@ -114,7 +144,7 @@ export function LineItemsEditor({
                     <Input
                       type="number"
                       inputMode="decimal"
-                      value={item.hours ?? ""}
+                      value={item.hours || ""}
                       onChange={(e) =>
                         update(item.id, { hours: Number(e.target.value) })
                       }
@@ -127,7 +157,7 @@ export function LineItemsEditor({
                     <Input
                       type="number"
                       inputMode="decimal"
-                      value={item.days ?? ""}
+                      value={item.days || ""}
                       onChange={(e) =>
                         update(item.id, { days: Number(e.target.value) })
                       }
@@ -169,9 +199,19 @@ export function LineItemsEditor({
         </div>
       ))}
 
-      <Button variant="outline" onClick={add} className="w-full">
-        <Plus className="size-4" /> Add line item
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button variant="outline" onClick={add} className="flex-1">
+          <Plus className="size-4" /> Add line item
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={addEstablishment}
+          className="flex-1"
+        >
+          <Wrench className="size-4" /> Add establishment fee
+        </Button>
+      </div>
     </div>
   );
 }
