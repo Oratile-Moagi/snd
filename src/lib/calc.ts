@@ -1,4 +1,4 @@
-import type { LineItem, Quote, Invoice } from "./types";
+import type { LineItem, Quote, Invoice, InvoiceStatus } from "./types";
 
 /** Compute the total for a single line item based on its pricing type. */
 export function lineItemTotal(item: LineItem): number {
@@ -67,6 +67,19 @@ export function formatDate(iso?: string): string {
     month: "short",
     year: "numeric",
   }).format(d);
+}
+
+/** Derive effective status: unpaid invoices past their due date become overdue. */
+export function effectiveInvoiceStatus(inv: Invoice): InvoiceStatus {
+  if (inv.status === "paid") return "paid";
+  if (inv.status === "unpaid" && inv.dueDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(inv.dueDate);
+    due.setHours(0, 0, 0, 0);
+    if (due < today) return "overdue";
+  }
+  return inv.status;
 }
 
 export function todayISO(): string {
